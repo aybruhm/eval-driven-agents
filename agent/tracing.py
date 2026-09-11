@@ -3,20 +3,17 @@ import time
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 
 class Trace:
-    """
-    A minimal trace wrapper you attach to any agent loop.
-    """
-
     def __init__(self, run_input: str) -> None:
-        self.steps = []
+        self.trace_id = str(uuid.uuid4())
         self.run_input = run_input
+        self.steps: list[dict[str, Any]] = []
         self.start_time = time.time()
-        self.trace_id = str(uuid.uuid7())
 
-    def _log(self, step_type: str, **data):
+    def log_step(self, step_type: str, **data) -> None:
         self.steps.append(
             {
                 "step_type": step_type,  # "model_call" | "tool_call" | "tool_result" | "final_output"
@@ -26,14 +23,11 @@ class Trace:
         )
 
     @contextmanager
-    def log_step(self, step_type: str, **data):
+    def instrument(self, step_type: str, **data):
         t0 = time.time()
         yield
         data["duration_s"] = time.time() - t0
-        self._log(
-            step_type=step_type,
-            **data,
-        )
+        self.log_step(step_type, **data)
 
     def save(self, path: str = "data/traces"):
         Path(path).mkdir(parents=True, exist_ok=True)
