@@ -6,6 +6,8 @@ from typing import Any
 import anthropic
 from dotenv import load_dotenv
 
+from agent.core import calculate_cost
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Identity-linked API keys must declare which workspace a request acts in.
@@ -14,6 +16,11 @@ client = anthropic.Anthropic(
     default_headers={"anthropic-workspace-id": workspace_id} if workspace_id else None,
     api_key=os.getenv("ANTHROPIC_API_KEY"),
 )
+
+# Pin the judge model separately from the agent model. When this bumps,
+# CI re-measures judge/human agreement (test_judge_agreement_above_threshold).
+# For production, pin a dated snapshot so scores can't drift mid-release.
+JUDGE_MODEL = "claude-sonnet-4-6"
 
 JUDGE_PROMPT = """You are grading an AI agent's response for faithfulness to its retrieved context.
 
@@ -34,7 +41,7 @@ Respond ONLY with JSON: {{"score": <int>, "reasoning": "<one sentence>"}}"""
 
 def judge_faithfulness(context: str, response: str) -> dict[str, Any]:
     result = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=JUDGE_MODEL,
         max_tokens=200,
         messages=[
             {
@@ -49,4 +56,6 @@ def judge_faithfulness(context: str, response: str) -> dict[str, Any]:
     content = result.content[0]
     if not hasattr(content, "text"):
         raise ValueError(f"Unexpected response block type: {type(content).__name__}")
-    return json.loads(content.text)  # type: ignore
+    parsed = json.loads(content.text)  # type: ignore
+    parsed["cost_usd"] = calculate_cost(result)
+    return parsed

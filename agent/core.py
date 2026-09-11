@@ -18,6 +18,11 @@ client = anthropic.Anthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY"),
 )
 
+# Pin the model here so every bump is a one-line, reviewable change.
+# For production, pin a dated snapshot (e.g. claude-sonnet-4-6-20250929)
+# so scores can't drift underneath the eval suite.
+AGENT_MODEL = "claude-sonnet-4-6"
+
 DEFAULT_SYSTEM_PROMPT = (
     "You are a customer support agent for an online store. Use the available "
     "tools to look up order status and knowledge base articles before answering. "
@@ -52,7 +57,7 @@ def run_agent(
     for _ in range(max_steps):
         with trace.instrument("model_call"):
             create_kwargs = {
-                "model": "claude-sonnet-4-6",
+                "model": AGENT_MODEL,
                 "max_tokens": 1024,
                 "system": system_prompt
                 if system_prompt is not None
