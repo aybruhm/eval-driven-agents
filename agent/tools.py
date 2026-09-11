@@ -3,15 +3,24 @@ _ORDERS = {
     "4471": {"status": "Shipped", "eta": "2026-09-05"},
     "4472": {"status": "Processing", "eta": "2026-09-10"},
 }
+_REFUND_POLICY = "Refunds are issued within 5 business days for unused items returned within 30 days."
 _KB = {
-    "refund policy": "Refunds are issued within 5 business days for unused items returned within 30 days.",
+    "refund policy": _REFUND_POLICY,
+    "return window": _REFUND_POLICY,
+    "returns": _REFUND_POLICY,
     "shipping": "Standard shipping takes 3-5 business days; express takes 1-2.",
 }
 
 
 def search_kb(query: str) -> str:
+    query = query.lower()
     for key, content in _KB.items():
-        if key in query.lower():
+        if key in query:
+            return content
+
+    query_tokens = set(query.split())
+    for key, content in _KB.items():
+        if query_tokens & set(key.split()):
             return content
     return "No matching knowledge base article found."
 
@@ -49,7 +58,6 @@ TOOLS = [
     },
 ]
 
-# Dispatch table agent/core.py uses to actually invoke the tool the model picked
 TOOL_FUNCTIONS = {
     "search_kb": search_kb,
     "get_order_status": get_order_status,

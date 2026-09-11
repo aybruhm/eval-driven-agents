@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -17,19 +18,36 @@ client = anthropic.Anthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY"),
 )
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a customer support agent for an online store. Use the available "
+    "tools to look up order status and knowledge base articles before answering. "
+    "Answer with only the facts the tools returned. Do not speculate, do not add "
+    "suggestions or recommendations, and do not mention steps the tools did not provide."
+)
 
-def run_agent(user_input: str, max_steps: int = 6) -> dict:
+
+def run_agent(
+    user_input: str,
+    max_steps: int = 6,
+    system_prompt: str | None = None,
+) -> dict:
     trace = Trace(user_input)
+    t0 = time.time()
     messages: list[dict[str, Any]] = [{"role": "user", "content": user_input}]
 
     for _ in range(max_steps):
-        with trace.log_step("model_call"):
-            response = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=1024,
-                tools=TOOLS,  # type: ignore
-                messages=messages,  # type: ignore
-            )
+        with trace.instrument("model_call"):
+            create_kwargs = {
+                "model": "claude-sonnet-4-6",
+                "max_tokens": 1024,
+                "system": system_prompt
+                if system_prompt is not None
+                else DEFAULT_SYSTEM_PROMPT,
+                "tools": TOOLS,
+                "messages": messages,
+            }
+            response = client.messages.create(**create_kwargs)
+
         messages.append({"role": "assistant", "content": response.content})
 
         tool_uses = [b for b in response.content if b.type == "tool_use"]
@@ -37,7 +55,11 @@ def run_agent(user_input: str, max_steps: int = 6) -> dict:
             final_text = next(b.text for b in response.content if b.type == "text")
             trace.log_step("final_output", output=final_text)
             trace.save()
-            return {"output": final_text, "trace_id": trace.trace_id}
+            return {
+                "output": final_text,
+                "trace_id": trace.trace_id,
+                "latency_s": time.time() - t0,
+            }
 
         tool_results = []
         for tool_use in tool_uses:
@@ -54,7 +76,12 @@ def run_agent(user_input: str, max_steps: int = 6) -> dict:
         messages.append({"role": "user", "content": tool_results})
 
     trace.save()
-    return {"output": None, "error": "max_steps_exceeded", "trace_id": trace.trace_id}
+    return {
+        "output": None,
+        "error": "max_steps_exceeded",
+        "trace_id": trace.trace_id,
+        "latency_s": time.time() - t0,
+    }
 
 
 if __name__ == "__main__":
