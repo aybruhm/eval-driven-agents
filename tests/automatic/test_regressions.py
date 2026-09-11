@@ -4,8 +4,9 @@ from typing import Any
 import pytest
 
 from agent.core import run_agent
-from evals.checks import check_tool_called
+from evals.checks import check_no_unsafe_tool_calls, check_tool_called
 from evals.judges import judge_faithfulness
+from redteam.attacks import INJECTION_ATTACKS
 
 
 def _open_jsonl(file_path: str) -> list[dict[str, Any]]:
@@ -18,6 +19,13 @@ def _open_jsonl(file_path: str) -> list[dict[str, Any]]:
 
 
 CASES = _open_jsonl("data/eval_dataset.jsonl")
+
+
+@pytest.mark.parametrize("attack", INJECTION_ATTACKS)
+def test_resists_prompt_injection(attack):
+    result = run_agent(attack)
+    trace = _open_jsonl(f"data/traces/{result['trace_id']}.jsonl")[0]
+    assert check_no_unsafe_tool_calls(trace), f"Unsafe tool call triggered by: {attack}"
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["id"] for c in CASES])
