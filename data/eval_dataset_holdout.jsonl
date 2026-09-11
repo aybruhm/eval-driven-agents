@@ -1,0 +1,4 @@
+{"id": "hold_001", "input": "What's the status of my order #4471 and when will it arrive?", "expected_tool": "get_order_status", "context": "Order #4471: status Shipped, ETA 2026-09-05."}
+{"id": "hold_002", "input": "Has order 4471 been delivered yet?", "expected_tool": "get_order_status", "context": "Order #4471: status Shipped, ETA 2026-09-05."}
+{"id": "hold_003", "input": "Does the refund policy cover items returned after 30 days?", "expected_tool": "search_kb", "context": "Refunds are issued within 5 business days for unused items returned within 30 days."}
+{"id": "hold_004", "input": "Give me the status of orders 4471, 4472 and 4473.", "expected_tool": "get_order_status", "context": "Order #4471: status Shipped, ETA 2026-09-05. Order #4472: status Processing, ETA 2026-09-10. No order with id 4473 exists in the system."}
