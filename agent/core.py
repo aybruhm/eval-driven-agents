@@ -25,6 +25,19 @@ DEFAULT_SYSTEM_PROMPT = (
     "suggestions or recommendations, and do not mention steps the tools did not provide."
 )
 
+# Pricing per million tokens, for claude-sonnet-4-6.
+INPUT_PRICE_PER_MTok = 3.0
+OUTPUT_PRICE_PER_MTok = 15.0
+
+
+def calculate_cost(response: anthropic.types.Message) -> float:
+    input_tokens = response.usage.input_tokens
+    output_tokens = response.usage.output_tokens
+    return (
+        input_tokens / 1_000_000 * INPUT_PRICE_PER_MTok
+        + output_tokens / 1_000_000 * OUTPUT_PRICE_PER_MTok
+    )
+
 
 def run_agent(
     user_input: str,
@@ -34,6 +47,7 @@ def run_agent(
     trace = Trace(user_input)
     t0 = time.time()
     messages: list[dict[str, Any]] = [{"role": "user", "content": user_input}]
+    total_cost = 0.0
 
     for _ in range(max_steps):
         with trace.instrument("model_call"):
@@ -48,6 +62,10 @@ def run_agent(
             }
             response = client.messages.create(**create_kwargs)
 
+        step_cost = calculate_cost(response)
+        total_cost += step_cost
+        trace.log_step("model_call_cost", cost_usd=step_cost)
+
         messages.append({"role": "assistant", "content": response.content})
 
         tool_uses = [b for b in response.content if b.type == "tool_use"]
@@ -58,6 +76,7 @@ def run_agent(
             return {
                 "output": final_text,
                 "trace_id": trace.trace_id,
+                "cost_usd": total_cost,
                 "latency_s": time.time() - t0,
             }
 
@@ -80,6 +99,7 @@ def run_agent(
         "output": None,
         "error": "max_steps_exceeded",
         "trace_id": trace.trace_id,
+        "cost_usd": total_cost,
         "latency_s": time.time() - t0,
     }
 
