@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from typing import Any
+
 # Toy backing "data" so the labs are self-contained
 _ORDERS = {
     "4471": {"status": "Shipped", "eta": "2026-09-05"},
@@ -58,7 +61,8 @@ TOOLS = [
     },
 ]
 
-TOOL_FUNCTIONS = {
+TOOL_FUNCTIONS: dict[str, Callable[..., Any]] = {
+
     "search_kb": search_kb,
     "get_order_status": get_order_status,
 }
